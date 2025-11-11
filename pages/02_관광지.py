@@ -18,4 +18,28 @@ locations = [
     {"name": "홍대 (Hongdae)", "lat": 37.556316, "lon": 126.922623, "desc": "젊음과 예술의 거리 🎶"},
     {"name": "동대문디자인플라자 (DDP)", "lat": 37.566495, "lon": 127.009044, "desc": "미래적 디자인의 명소 🛸"},
     {"name": "청계천 (Cheonggyecheon Stream)", "lat": 37.570157, "lon": 126.978577, "desc": "도심 속 힐링 산책로 🌿"},
-    {"name": "롯데월드타워 (Lotte World Tower)", "lat": 37.512544, "lon": 127.10
+    {"name": "롯데월드타워 (Lotte World Tower)", "lat": 37.512544, "lon": 127.102567, "desc": "서울의 초고층 랜드마크 🏙️"},
+    {"name": "이태원 (Itaewon)", "lat": 37.534849, "lon": 126.994416, "desc": "다문화와 음식의 거리 🌍"}
+]
+
+# 지도 생성
+m = folium.Map(location=[37.5665, 126.9780], zoom_start=12)
+
+# 마커 추가 (빨간색)
+for loc in locations:
+    folium.Marker(
+        [loc["lat"], loc["lon"]],
+        popup=f"<b>{loc['name']}</b><br>{loc['desc']}",
+        tooltip=loc["name"],
+        icon=folium.Icon(color="red", icon="info-sign"),
+    ).add_to(m)
+
+# 지도 출력 (70% 크기)
+st_data = st_folium(m, width=630, height=420)
+
+# 하단에 관광지 설명 표 표시
+st.subheader("📍 관광지 요약")
+df = pd.DataFrame(
+    [{"명소 이름": loc["name"], "설명": loc["desc"]} for loc in locations]
+)
+st.dataframe(df, use_container_width=True, hide_index=True)
