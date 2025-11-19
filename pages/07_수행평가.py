@@ -2,30 +2,38 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from pathlib import Path # Pathlib 임포트
 
 # 1. 파일 로드 및 데이터 전처리 함수
 @st.cache_data
 def load_data(file_path):
     """CSV 파일을 로드하고 컬럼명을 정리하며 데이터 타입을 변환합니다."""
     
-    # 파일 인코딩 처리 (utf-8 시도 후 cp949 또는 euc-kr 시도)
-    try:
-        df = pd.read_csv(file_path, encoding='utf-8')
-    except FileNotFoundError:
-        # 파일 경로 에러가 발생하면 Streamlit에서 에러 메시지 출력 후 빈 DataFrame 반환
-        st.error(f"❌ 파일을 찾을 수 없습니다: {file_path}. CSV 파일이 루트 폴더에 있는지 확인해 주세요.")
+    # pathlib.Path를 사용하여 경로 객체 생성 및 파일 존재 확인
+    data_file_path = Path(__file__).parent.parent / file_path 
+    # __file__ : 현재 스크립트 파일의 경로 (예: /mount/src/.../pages/analysis_page.py)
+    # .parent : 'pages' 폴더 (부모 폴더로 이동)
+    # .parent : '루트' 폴더 (부모 폴더로 다시 이동)
+    # / file_path : 루트 폴더 아래의 'dubbongispig.csv' 파일 경로 생성
+    
+    if not data_file_path.exists():
+        st.error(f"❌ 파일을 찾을 수 없습니다: {data_file_path}. CSV 파일이 **루트 폴더**에 있는지 확인해 주세요.")
         return pd.DataFrame()
+        
+    # 파일 인코딩 처리
+    try:
+        # data_file_path 객체를 사용하여 파일 로드
+        df = pd.read_csv(data_file_path, encoding='utf-8')
     except UnicodeDecodeError:
         try:
-            df = pd.read_csv(file_path, encoding='cp949')
+            df = pd.read_csv(data_file_path, encoding='cp949')
         except Exception:
-            df = pd.read_csv(file_path, encoding='euc-kr')
+            df = pd.read_csv(data_file_path, encoding='euc-kr')
 
-    # 컬럼명 클리닝 (가독성 및 사용 편의성 향상)
+    # 컬럼명 클리닝 (이전과 동일)
     column_mapping = {
         '순번': 'ID', '품종': 'Species', '시도': 'Sido', '시군': 'Sigungu', '년도': 'Year',
         '전체호수': 'Total_Farms', '전체두수': 'Total_Heads',
-        # 규모별 컬럼명 단순화
         '5000두 이상(호수)': '5k_up_Farms', '5000두 이상(두수)': '5k_up_Heads',
         '5000두-2000두 이상(호수)': '5k_2k_Farms', '5000두-2000두 이상(두수)': '5k_2k_Heads',
         '2000두-1000두 이상(호수)': '2k_1k_Farms', '2000두-1000두 이상(두수)': '2k_1k_Heads',
@@ -43,21 +51,17 @@ def load_data(file_path):
         
     return df
 
-# 2. Plotly 막대 그래프 생성 함수 (큰 값 정렬, 1등 빨강, 나머지 그라데이션)
+# 2. Plotly 막대 그래프 생성 함수 (이전과 동일)
 def create_custom_bar_chart(df_filtered, year):
     
-    # 시군별 전체두수 합산 및 큰 값부터 정렬
     df_plot = df_filtered.groupby('Sigungu')['Total_Heads'].sum().reset_index()
     df_plot = df_plot.sort_values(by='Total_Heads', ascending=False)
     
     if df_plot.empty:
         return go.Figure()
 
-    # 색상 설정 로직
     colors = []
     max_heads = df_plot['Total_Heads'].max()
-    
-    # 그라데이션 시퀀스: 파란색 계열을 사용하며, 큰 값에 진한 색 적용 (Blues_r)
     gradient_colors = px.colors.sequential.Blues_r
     non_max_count = (df_plot['Total_Heads'] < max_heads).sum()
     gradient_index = 0
@@ -74,7 +78,6 @@ def create_custom_bar_chart(df_filtered, year):
                 colors.append('#3776ab')
             
 
-    # Plotly 인터랙티브 막대 그래프 생성
     fig = go.Figure(data=[go.Bar(
         x=df_plot['Sigungu'],
         y=df_plot['Total_Heads'],
@@ -84,12 +87,11 @@ def create_custom_bar_chart(df_filtered, year):
         hovertemplate="**%{x}**<br>전체 두수: %{y:,.0f}두<extra></extra>",
     )])
 
-    # 레이아웃 설정
     fig.update_layout(
         title=f"**{year}년도 시군별 전체 두수 순위** (총 {df_plot['Total_Heads'].sum():,}두)",
         xaxis_title="시/군",
         yaxis_title="전체 두수 (두)",
-        xaxis={'categoryorder': 'total descending'} # X축을 값에 따라 정렬
+        xaxis={'categoryorder': 'total descending'}
     )
     
     return fig
@@ -101,8 +103,8 @@ def main():
     st.title("🐇 가축 사육 현황 분석 (토끼) - Streamlit 대시보드")
     st.markdown("---")
 
-    # 데이터 로드 (상위 폴더에 있는 CSV 파일을 지정)
-    df = load_data('../dubbongispig.csv')
+    # 데이터 로드 (pathlib 사용으로 파일명만 전달)
+    df = load_data('dubbongispig.csv')
 
     if df.empty:
         st.stop()
@@ -119,7 +121,6 @@ def main():
     col3.metric("데이터 기간", f"{min(data_years)}년 ~ {max(data_years)}년")
 
     st.subheader("규모별 사육 현황 (최신 연도 기준)")
-    # 최신 연도 기준 규모별 사육 현황 테이블
     latest_year = df['Year'].max()
     df_latest_summary = df[df['Year'] == latest_year]
     
@@ -129,12 +130,9 @@ def main():
         
         st.dataframe(
             size_summary.rename(lambda x: x.replace('_Heads', ' 이상 두수')),
-            column_config={
-                "index": st.column_config.TextColumn("사육 규모", help="규모별 토끼 수"),
-                "value": st.column_config.NumberColumn("두수 (전체 합)", format="%d두"),
-            },
+            column_config={"value": st.column_config.NumberColumn("두수 (전체 합)", format="%d두")},
             use_container_width=True,
-            height=300
+            hide_index=False
         )
     
     st.markdown("---")
@@ -147,7 +145,6 @@ def main():
     requested_year = 2025
     st.subheader(f"⚠️ 요청하신 **{requested_year}년도 10월** 기록 시각화")
     
-    # 10월 필터링이 가능하도록 연월 컬럼을 만들어야 하나, CSV 파일에 월 정보가 없으므로 연도만 필터링합니다.
     df_2025 = df[df['Year'] == requested_year] 
     fig_2025 = create_custom_bar_chart(df_2025, f"{requested_year}년")
     
@@ -159,7 +156,6 @@ def main():
     st.markdown("---")
 
     # **(B) 시각화 작동 시연 (데이터가 있는 최신 연도)**
-    latest_year = df['Year'].max()
     st.subheader(f"✅ 시각화 작동 시연 (데이터가 있는 **최신 연도: {latest_year}년** 기준)")
     
     df_latest = df[df['Year'] == latest_year]
